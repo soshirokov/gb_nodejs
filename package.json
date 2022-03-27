@@ -6,7 +6,11 @@
   "type": "module",
   "scripts": {
     "dev": "node index.js",
+    "serve": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "bin": {
+    "reader": "cli.js"
   },
   "repository": {
     "type": "git",
@@ -21,6 +25,8 @@
   "homepage": "https://github.com/soshirokov/gb_nodejs#readme",
   "dependencies": {
     "colors": "^1.4.0",
-    "dayjs": "^1.10.8"
+    "dayjs": "^1.10.8",
+    "inquirer": "^8.2.0",
+    "yargs": "^17.2.1"
   }
 }

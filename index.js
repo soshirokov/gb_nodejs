@@ -1,63 +1,37 @@
-import dayjs from 'dayjs';
-import customParseFormat from 'dayjs/plugin/customParseFormat.js';
-import duration from 'dayjs/plugin/duration.js';
-import EventEmitter from 'events';
-import process from 'process';
+import fs from 'fs';
+import path from 'path';
+import http from 'http';
+const HTML_TEMPLATE = './index_template.html';
+const HTML_TO_DISPLAY = path.join(path.resolve(), 'index.html');
 
-dayjs.extend(duration);
-/*
-На вход принимает продолжительность таймера в формате ss-mm-hh-dd-mm-yy
-Например, 45-01-02-03-04-05 для 5 лет 4 месяцев 3 дней 2 часов 1 минуты 45 секунд
-*/
-const setTimers = process.argv.slice(2);
-const emitter = new EventEmitter();
+const isDir = (dirPath) => fs.lstatSync(dirPath).isDirectory();
 
-class Timer {
-    constructor(timerValue) {
-        this.endTime = this.getTimerEndTime(timerValue);
-        this.timerValue = timerValue;
-        
-        this.interval = setInterval(() => {
-            this.timerTick();
-        }, 1000);
+http.createServer((req, res) => {
+    const reqPath = path.join(path.resolve(), req.url);
+
+    if (isDir(reqPath)) {
+        const dirContent = fs.readdirSync(reqPath);
+        makeResultHTML(displayDirContent(req.url, dirContent));
+    } else {
+        makeResultHTML(fs.readFileSync(reqPath, 'utf-8'));
     }
 
-    getTimerEndTime(timerValue) {
-        const timerToArrayOfValues = timerValue.split('-');
-        if (timerToArrayOfValues.length < 6) {
-            throw new Error('Неверный формат продолжительности таймера');
-        }
-        const now = dayjs();
-        const timerDuration = dayjs.duration({
-            seconds: timerToArrayOfValues[0],
-            minutes: timerToArrayOfValues[1],
-            hours: timerToArrayOfValues[2],
-            days: timerToArrayOfValues[3],
-            months: timerToArrayOfValues[4],
-            years: timerToArrayOfValues[5],          
-        });
-        return now.add(timerDuration);
-    }
 
-    timerTick() {
-        const duration = dayjs.duration(this.endTime.diff(dayjs()));
-        if (duration.asSeconds() <= 0) {
-            emitter.emit('timerFinish', `Таймер ${this.timerValue} завершился`);
-            clearInterval(this.interval);
-        } else {
-            emitter.emit('timerTick', `До таймера ${this.timerValue} осталось ${duration.format('YY лет MM месяцев DD дней HH:mm:ss')}`);
-        }
-    }
-}
+    const readStream = fs.createReadStream(HTML_TO_DISPLAY);
+    res.writeHead(200, { 'Content-Type': 'text/html'});
+    readStream.pipe(res);
+}).listen(3001, 'localhost');
 
-setTimers.forEach(inputTimer => {
-    new Timer(inputTimer);
-});
+const displayDirContent = (currentPath, list) => {
+    let htmlList = '';
+    htmlList += '<ul>';
+    htmlList += list.reduce((list, item) => list+=`<li><a href="${currentPath == '/' ? currentPath + item : currentPath + '/' + item}">${item}</a></li>`, '');
+    htmlList += '</ul>';
+    return htmlList;
+};
 
-emitter.on('timerFinish', (payload) => {
-    console.log(payload);
-});
-
-emitter.on('timerTick', (payload) => {
-    console.log(payload);
-});
+const makeResultHTML = (toPresent) => {
+    let template = fs.readFileSync(HTML_TEMPLATE, 'utf-8');
+    template = template.replace('{{data}}', toPresent);
+    fs.writeFileSync('./index.html', template);
+};
