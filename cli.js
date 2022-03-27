@@ -1,4 +1,3 @@
-#!/Users/artemshashkov/.nvm/versions/node/v14.18.3/bin/node
 import fs from 'fs';
 import path from 'path';
 import inquirer from 'inquirer';
