@@ -1,12 +1,13 @@
 import fs from 'fs';
 import path from 'path';
 import http from 'http';
-const HTML_TEMPLATE = './index_template.html';
-const HTML_TO_DISPLAY = path.join(path.resolve(), 'index.html');
+import {Server} from 'socket.io';
+const HTML_TEMPLATE = './fileManager_template.html';
+const HTML_TO_DISPLAY = path.join(path.resolve(), 'fileManager.html');
 
 const isDir = (dirPath) => fs.lstatSync(dirPath).isDirectory();
 
-http.createServer((req, res) => {
+const server = http.createServer((req, res) => {
     const reqPath = path.join(path.resolve(), req.url);
 
     if (isDir(reqPath)) {
@@ -20,7 +21,9 @@ http.createServer((req, res) => {
     const readStream = fs.createReadStream(HTML_TO_DISPLAY);
     res.writeHead(200, { 'Content-Type': 'text/html'});
     readStream.pipe(res);
-}).listen(3001, 'localhost');
+}).listen(4444, 'localhost');
+
+const io = new Server(server);
 
 const displayDirContent = (currentPath, list) => {
     let htmlList = '';
@@ -33,5 +36,15 @@ const displayDirContent = (currentPath, list) => {
 const makeResultHTML = (toPresent) => {
     let template = fs.readFileSync(HTML_TEMPLATE, 'utf-8');
     template = template.replace('{{data}}', toPresent);
-    fs.writeFileSync('./index.html', template);
+    fs.writeFileSync(HTML_TO_DISPLAY, template);
 };
+
+io.on('connection', (client) => {
+    const userCount = io.engine.clientsCount;
+    client.broadcast.emit('changeUserCount', userCount);
+    client.emit('changeUserCount', userCount);
+
+    client.on("disconnect", () => {
+        client.broadcast.emit('changeUserCount', io.engine.clientsCount);
+    });
+});
