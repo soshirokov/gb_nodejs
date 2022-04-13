@@ -1,63 +1,33 @@
-import dayjs from 'dayjs';
-import customParseFormat from 'dayjs/plugin/customParseFormat.js';
-import duration from 'dayjs/plugin/duration.js';
-import EventEmitter from 'events';
-import process from 'process';
+import fs from 'fs';
+import readline from 'readline';
+import { Stream } from 'stream';
+const TEST_FILE = './access_tmp.log';
+// боевой файл 
+//const TRUE_FILE = './access.log';
+let IPs = process.argv.slice(2);
+const newStream = fs.createReadStream(TEST_FILE, 'utf-8');
+const outStream = new Stream();
+const readLineFromStream = readline.createInterface(newStream, outStream);
+const writeStreams = {};
 
-dayjs.extend(duration);
-/*
-На вход принимает продолжительность таймера в формате ss-mm-hh-dd-mm-yy
-Например, 45-01-02-03-04-05 для 5 лет 4 месяцев 3 дней 2 часов 1 минуты 45 секунд
-*/
-const setTimers = process.argv.slice(2);
-const emitter = new EventEmitter();
-
-class Timer {
-    constructor(timerValue) {
-        this.endTime = this.getTimerEndTime(timerValue);
-        this.timerValue = timerValue;
-        
-        this.interval = setInterval(() => {
-            this.timerTick();
-        }, 1000);
-    }
-
-    getTimerEndTime(timerValue) {
-        const timerToArrayOfValues = timerValue.split('-');
-        if (timerToArrayOfValues.length < 6) {
-            throw new Error('Неверный формат продолжительности таймера');
-        }
-        const now = dayjs();
-        const timerDuration = dayjs.duration({
-            seconds: timerToArrayOfValues[0],
-            minutes: timerToArrayOfValues[1],
-            hours: timerToArrayOfValues[2],
-            days: timerToArrayOfValues[3],
-            months: timerToArrayOfValues[4],
-            years: timerToArrayOfValues[5],          
-        });
-        return now.add(timerDuration);
-    }
-
-    timerTick() {
-        const duration = dayjs.duration(this.endTime.diff(dayjs()));
-        if (duration.asSeconds() <= 0) {
-            emitter.emit('timerFinish', `Таймер ${this.timerValue} завершился`);
-            clearInterval(this.interval);
-        } else {
-            emitter.emit('timerTick', `До таймера ${this.timerValue} осталось ${duration.format('YY лет MM месяцев DD дней HH:mm:ss')}`);
-        }
-    }
+if(IPs.length == 0) {
+    IPs = ['89.123.1.41', '34.48.240.111'];
 }
 
-setTimers.forEach(inputTimer => {
-    new Timer(inputTimer);
+IPs.forEach((IP) => {
+    writeStreams[IP] = fs.createWriteStream(`${IP}_requests.log`, {
+        encoding: 'utf-8',
+        flags: 'a'
+    });
+    
 });
 
-emitter.on('timerFinish', (payload) => {
-    console.log(payload);
-});
+readLineFromStream.on('line', (line) => {
+    if(line.length == 0) { return; }
 
-emitter.on('timerTick', (payload) => {
-    console.log(payload);
+    IPs.forEach((IP) => {
+        if(line.indexOf(IP) !== -1) {
+            writeStreams[IP].write(line + '\n');
+        }
+    });
 });
